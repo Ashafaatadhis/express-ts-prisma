@@ -1,13 +1,14 @@
-// import morgan from "morgan";
+import morgan from "morgan";
+import fs from "fs";
+import path from "path";
 
-// app.use(morgan("dev"));
-// app.use(
-//   morgan("combined", {
-//     stream: fs.createWriteStream(
-//       path.join(__dirname + "/../src/log", "file.log"),
-//       {
-//         flags: "a",
-//       }
-//     ),
-//   })
-// );
+export const logDev = morgan("dev");
+
+export const logProd = morgan("combined", {
+  stream: fs.createWriteStream(
+    path.join(path.resolve(__dirname, "../../src/log"), "file.log"),
+    {
+      flags: "a",
+    }
+  ),
+});

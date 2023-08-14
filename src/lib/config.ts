@@ -1,4 +1,6 @@
 import joi from "joi";
+import dotenv from "dotenv";
+dotenv.config();
 
 const envSchema = joi.object().keys({
   DATABASE_URL: joi.string().required(),

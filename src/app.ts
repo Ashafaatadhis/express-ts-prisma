@@ -1,26 +1,16 @@
-import express, { Express, NextFunction, Request, Response } from "express";
-import morgan from "morgan";
-import fs from "fs";
-import path from "path";
-import dotenv from "dotenv";
+import express, { Express, Request, Response } from "express";
+import config from "./lib/config";
 import routes from "./routes";
+import { logDev, logProd } from "./middleware/logger";
 import { errorHandler } from "./middleware/errorHandler";
-
-dotenv.config();
 
 const app: Express = express();
 
-app.use(morgan("dev"));
-app.use(
-  morgan("combined", {
-    stream: fs.createWriteStream(
-      path.join(__dirname + "/../src/log", "file.log"),
-      {
-        flags: "a",
-      }
-    ),
-  })
-);
+if (config.NODE_ENV == "production") {
+  app.use(logProd);
+} else {
+  app.use(logDev);
+}
 
 app.use(express.json());
 app.use(routes);
