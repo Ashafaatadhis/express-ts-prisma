@@ -1,12 +1,9 @@
 import { Router } from "express";
-import users from "./users";
-import login from "./login";
-import refreshToken from "./refreshToken";
+import users from "./v1/users.route";
+import v1 from "./v1";
 
 const router: Router = Router();
 
-router.use("/", users);
-router.use("/login", login);
-router.use("/refresh-token", refreshToken);
+router.use("/v1", v1);
 
 export default router;

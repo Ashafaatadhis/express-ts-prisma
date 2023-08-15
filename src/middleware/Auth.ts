@@ -6,12 +6,11 @@ import {
 } from "passport-jwt";
 import passport from "passport";
 import prisma from "../lib/prisma";
-
-const keyJWT = process.env.JWT_SECRET || "secret";
+import config from "../lib/config";
 
 const opts: StrategyOptions = {
   jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-  secretOrKey: keyJWT,
+  secretOrKey: config.JWT_SECRET,
 };
 passport.use(
   new Strategy(opts, async (jwt_payload: any, done: VerifiedCallback) => {
@@ -28,4 +27,4 @@ passport.use(
   })
 );
 
-export { passport, keyJWT };
+export default passport;
