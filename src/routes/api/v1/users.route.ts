@@ -1,17 +1,7 @@
-import { Router, Request, Response } from "express";
-import passport from "../../../middleware/Auth";
+import { Router } from "express";
+import { getUser } from "../../../controllers/user.controller";
 
 const router: Router = Router();
-router.get(
-  "/",
-  passport.authenticate("jwt", { session: false }),
-  (req: Request, res: Response) => {
-    res.json({ tes: "tes" });
-  }
-);
-
-router.post("/", (req: Request, res: Response) => {
-  res.json({ tes: "tes" });
-});
+router.get("/", getUser);
 
 export default router;
