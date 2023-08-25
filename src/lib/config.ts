@@ -7,6 +7,7 @@ const envSchema = joi.object().keys({
   PORT: joi.number().required().default(8080),
   NODE_ENV: joi.string().valid("production", "development", "test").required(),
   JWT_SECRET: joi.string().min(8).required(),
+  SALT_ROUND: joi.number().greater(5).required().default(8),
 });
 
 const { value, error } = envSchema
@@ -26,6 +27,7 @@ const config = {
   PORT: value.PORT,
   NODE_ENV: value.NODE_ENV,
   JWT_SECRET: value.JWT_SECRET,
+  SALT_ROUND: value.SALTROUND,
 };
 
 export default config;

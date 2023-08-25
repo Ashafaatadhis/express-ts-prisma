@@ -22,6 +22,8 @@ export const login = async (req: Request, res: Response) => {
     // ) {
     //   res.json({ msg: "You are already logged in" });
     // } else {
+
+    // catatan, jika user ketemu, dan jika ada refreshtoken
     const user = { id: acc.id, name: acc.name, email: acc.email };
     const accessToken = jwt.sign(user, config.JWT_SECRET, { expiresIn: "30s" });
     const refreshToken = crypto.randomBytes(32).toString("hex");

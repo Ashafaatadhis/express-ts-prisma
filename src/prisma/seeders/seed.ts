@@ -1,4 +1,5 @@
 import prisma from "../../lib/prisma";
+import { hash } from "../../lib/configHash";
 
 const main = async () => {
   const alice = await prisma.user.upsert({
@@ -7,6 +8,7 @@ const main = async () => {
     create: {
       email: "alice@prisma.io",
       name: "Alice",
+      password: await hash("alice"),
       posts: {
         create: {
           title: "Check out Prisma with Next.js",
@@ -23,6 +25,7 @@ const main = async () => {
     create: {
       email: "bob@prisma.io",
       name: "Bob",
+      password: await hash("bob"),
     },
   });
 

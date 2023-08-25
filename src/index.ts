@@ -8,7 +8,7 @@ process.on("SIGINT", async (e) => {
   process.exit(1);
 });
 
-app.listen(config.PORT, () => {
+app.listen(config.PORT, async () => {
   console.log(
     `⚡️[server]: Server is running at http://localhost:${config.PORT}`
   );
