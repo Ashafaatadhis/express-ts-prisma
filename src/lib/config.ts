@@ -8,6 +8,9 @@ const envSchema = joi.object().keys({
   NODE_ENV: joi.string().valid("production", "development", "test").required(),
   JWT_SECRET: joi.string().min(8).required(),
   SALT_ROUND: joi.number().greater(5).required().default(8),
+  ACCESS_TOKEN_EXPIRE: joi.string().required(),
+  REFRESH_TOKEN_EXPIRE: joi.number().greater(0).required(),
+  REFRESH_TOKEN_COOKIE_NAME: joi.string().default("jid"),
 });
 
 const { value, error } = envSchema
@@ -28,6 +31,9 @@ const config = {
   NODE_ENV: value.NODE_ENV,
   JWT_SECRET: value.JWT_SECRET,
   SALT_ROUND: value.SALTROUND,
+  ACCESS_TOKEN_EXPIRE: value.ACCESS_TOKEN_EXPIRE,
+  REFRESH_TOKEN_EXPIRE: value.REFRESH_TOKEN_EXPIRE,
+  REFRESH_TOKEN_COOKIE_NAME: value.REFRESH_TOKEN_COOKIE_NAME,
 };
 
 export default config;

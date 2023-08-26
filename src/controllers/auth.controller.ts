@@ -1,63 +1,126 @@
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import config from "../lib/config";
-import crypto from "crypto";
+import { verify } from "../lib/configHash";
+import { createAccessToken, createRefreshToken } from "../utils/generateToken";
 
 import prisma from "../lib/prisma";
+import {
+  refreshTokenConfig,
+  clearRefreshTokenConfig,
+} from "../lib/cookieConfig";
 
 export const login = async (req: Request, res: Response) => {
   //   console.log(req.body.email);
-  const acc = await prisma.user.findFirst({
-    where: { email: req.body.email },
-    include: { refreshToken: { select: { expiredIn: true } } },
+  const cookies = req.cookies;
+  const { email, password } = req.body;
+
+  const user = await prisma.user.findUnique({
+    where: { email: email },
   });
 
-  //   if user find, it means jwt is valid
-  if (acc) {
-    // if user already have refresh token and refresh token no expire, this will return msg you are already logged in
-    // else, will create new token and store it to database
-    // if (
-    //   acc.refreshToken &&
-    //   new Date(acc.refreshToken.expiredIn).getTime() - new Date().getTime() > 0
-    // ) {
-    //   res.json({ msg: "You are already logged in" });
-    // } else {
-
-    // catatan, jika user ketemu, dan jika ada refreshtoken
-    const user = { id: acc.id, name: acc.name, email: acc.email };
-    const accessToken = jwt.sign(user, config.JWT_SECRET, { expiresIn: "30s" });
-    const refreshToken = crypto.randomBytes(32).toString("hex");
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);
-
-    const data = await prisma.refresh_token.upsert({
-      where: {
-        userId: acc.id,
-      },
-      update: {
-        refreshToken: refreshToken,
-        expiredIn: tomorrow.toISOString(),
-        userId: acc.id,
-      },
-      create: {
-        refreshToken: refreshToken,
-        expiredIn: tomorrow.toISOString(),
-        userId: acc.id,
-      },
-    });
-
-    res.status(200).json({ accessToken, refreshToken });
-    // }
-  } else {
-    res.status(401).json({ msg: "Login Failed" });
+  if (!user) {
+    return res.status(401).json({ msg: "Login Failed" });
   }
+
+  try {
+    if (await verify(password, user.password)) {
+      if (cookies?.[config.REFRESH_TOKEN_COOKIE_NAME]) {
+        const checkRefreshToken = await prisma.refresh_token.findUnique({
+          where: {
+            refreshToken: cookies[config.REFRESH_TOKEN_COOKIE_NAME],
+          },
+        });
+
+        if (!checkRefreshToken || checkRefreshToken.userId !== user.id) {
+          await prisma.refresh_token.deleteMany({
+            where: {
+              userId: user.id,
+            },
+          });
+        } else {
+          await prisma.refresh_token.delete({
+            where: {
+              refreshToken: cookies[config.REFRESH_TOKEN_COOKIE_NAME],
+            },
+          });
+        }
+
+        res.clearCookie(
+          config.REFRESH_TOKEN_COOKIE_NAME,
+          clearRefreshTokenConfig
+        );
+      }
+      const accessToken = createAccessToken(user.id);
+      const refreshToken = createRefreshToken();
+
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + config.REFRESH_TOKEN_EXPIRE);
+
+      const data = await prisma.refresh_token.create({
+        data: {
+          refreshToken: refreshToken,
+          expiredIn: tomorrow.toISOString(),
+          userId: user.id,
+        },
+      });
+
+      res.cookie(
+        config.REFRESH_TOKEN_COOKIE_NAME,
+        refreshToken,
+        refreshTokenConfig
+      );
+
+      return res.status(200).json({ accessToken });
+    } else {
+      return res.status(401).json({ msg: "Login Failed" });
+    }
+  } catch (e) {
+    return res.status(401).json({ msg: "Login Failed" });
+  }
+
+  // }
+};
+
+export const handleLogout = async (req: Request, res: Response) => {
+  const cookies = req.cookies;
+
+  if (!cookies[config.REFRESH_TOKEN_COOKIE_NAME]) {
+    return res.sendStatus(204);
+  }
+
+  const refreshToken = cookies[config.REFRESH_TOKEN_COOKIE_NAME];
+  const foundRft = await prisma.refresh_token.findUnique({
+    where: {
+      refreshToken: refreshToken,
+    },
+  });
+
+  if (!foundRft) {
+    res.clearCookie(config.REFRESH_TOKEN_COOKIE_NAME, clearRefreshTokenConfig);
+    return res.sendStatus(204);
+  }
+
+  await prisma.refresh_token.delete({
+    where: {
+      refreshToken: refreshToken,
+    },
+  });
+
+  res.clearCookie(config.REFRESH_TOKEN_COOKIE_NAME, clearRefreshTokenConfig);
+  return res.sendStatus(204);
 };
 
 export const refreshToken = async (req: Request, res: Response) => {
-  const token = req.body.token;
+  const token: string | undefined =
+    req.cookies[config.REFRESH_TOKEN_COOKIE_NAME];
 
-  const data = await prisma.refresh_token.findFirst({
+  if (!token) return res.status(401).json({ msg: "Unauthorized" });
+
+  res.clearCookie(config.REFRESH_TOKEN_COOKIE_NAME, clearRefreshTokenConfig);
+
+  const foundRefreshToken = await prisma.refresh_token.findUnique({
     where: {
       refreshToken: token,
     },
@@ -65,12 +128,41 @@ export const refreshToken = async (req: Request, res: Response) => {
       user: true,
     },
   });
-  if (data && new Date(data.expiredIn).getTime() - new Date().getTime() > 0) {
-    const accessToken = jwt.sign(data.user, config.JWT_SECRET, {
-      expiresIn: "30s",
-    });
-    res.status(200).json({ accessToken });
-  } else {
-    res.status(401).json({ msg: "Token invalid or Expired" });
+
+  // if refresh token not found and expired, it will return 401
+  if (
+    !foundRefreshToken ||
+    new Date(foundRefreshToken.expiredIn).getTime() - new Date().getTime() < 0
+  ) {
+    return res.status(401).json({ msg: "Token invalid or Expired" });
   }
+
+  await prisma.refresh_token.delete({
+    where: {
+      refreshToken: token,
+    },
+  });
+
+  const accessToken = createAccessToken(foundRefreshToken.userId);
+  const newRefreshToken = createRefreshToken();
+
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + config.REFRESH_TOKEN_EXPIRE);
+
+  await prisma.refresh_token.create({
+    data: {
+      refreshToken: newRefreshToken,
+      expiredIn: tomorrow.toISOString(),
+      userId: foundRefreshToken.userId,
+    },
+  });
+
+  res.cookie(
+    config.REFRESH_TOKEN_COOKIE_NAME,
+    newRefreshToken,
+    refreshTokenConfig
+  );
+
+  res.status(200).json({ accessToken });
 };
